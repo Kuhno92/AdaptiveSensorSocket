@@ -2,10 +2,12 @@
 #include <ESP8266WiFiMulti.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
+#include <FS.h>
 #include <time.h>
 #include "Ticker.h"
 #include <WebSocketsServer.h>
-#include "index.h" //Our HTML webpage contents
+
+const char* htmlfile = "/index.html";
 
 int relayPin = D5; // the input to the relay pin
 int sensor = D7;
@@ -33,9 +35,21 @@ void setup() {
   pinMode(sensor2, OUTPUT); // initialize pin as OUTPUT
   pinMode(sensor, INPUT); // initialize pin as INPUT
   digitalWrite(relayPin, LOW); // init relay to off
-
-    // Start Serial
+  
+  // Start Serial
   Serial.begin(9600);
+  
+  //Initialize File System
+  SPIFFS.begin();
+  Serial.println("File System Initialized");
+  Dir dir = SPIFFS.openDir("/");
+    while (dir.next()) {
+      String fileName = dir.fileName();
+      size_t fileSize = dir.fileSize();
+      Serial.printf("FS File: %s, size: %s\n", fileName.c_str(), String(fileSize).c_str());
+      Serial.println();
+    }
+
   startWiFi();
   startWebSocket();            // Start a WebSocket server
   startMDNS();                 // Start the mDNS responder
@@ -43,11 +57,6 @@ void setup() {
   getTime();
 }
 void loop() {
-   // check if WLAN is connected
-  if (WiFi.status() != WL_CONNECTED)
-  {
-    startWiFi();
-  }
   server.handleClient();          //Handle client requests
   webSocket.loop();               // constantly check for websocket events
 }
@@ -56,17 +65,34 @@ void loop() {
 // This routine is executed when you open its IP in browser
 //===============================================================
 void handleRoot() {
- String s = MAIN_page; //Read HTML contents
- server.send(200, "text/html", s); //Send web page
+  server.sendHeader("Location", "/index.html",true);   //Redirect to our html web page
+  server.send(302, "text/plane","");
+}
+void handleWebRequests(){
+  if(loadFromSpiffs(server.uri())) return;
+  String message = "File Not Detected\n\n";
+  message += "URI: ";
+  message += server.uri();
+  message += "\nMethod: ";
+  message += (server.method() == HTTP_GET)?"GET":"POST";
+  message += "\nArguments: ";
+  message += server.args();
+  message += "\n";
+  for (uint8_t i=0; i<server.args(); i++){
+    message += " NAME:"+server.argName(i) + "\n VALUE:" + server.arg(i) + "\n";
+  }
+  server.send(404, "text/plain", message);
+  Serial.println(message);
 }
 //**************************************INITIALIZATION FUNCTIONS ******************************************
 void startWiFi() { // Start a Wi-Fi access point, and try to connect to some given access points. Then wait for either an AP or STA connection
-  WiFi.softAP(ssid, password);             // Start the access point
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(ssid, password);  
   Serial.print("Access Point \"");
   Serial.print(ssid);
   Serial.println("\" started\r\n");
 
-  wifiMulti.addAP("DontTouchThis", "!No3nTrY!1234567890");   // add Wi-Fi networks you want to connect to
+  wifiMulti.addAP("DontTouchThis", "!No3nTrY!123456789");   // add Wi-Fi networks you want to connect to
   wifiMulti.addAP("ssid_from_AP_2", "your_password_for_AP_2");
   wifiMulti.addAP("ssid_from_AP_3", "your_password_for_AP_3");
 
@@ -81,8 +107,11 @@ void startWiFi() { // Start a Wi-Fi access point, and try to connect to some giv
     Serial.println(WiFi.SSID());             // Tell us what network we're connected to
     Serial.print("IP address:\t");
     Serial.print(WiFi.localIP());            // Send the IP address of the ESP8266 to the computer
-  } else {                                   // If a station is connected to the ESP SoftAP
+    WiFi.mode(WIFI_STA);
+  } else {
+    // If a station is connected to the ESP SoftAP
     Serial.print("Station connected to ESP8266 AP");
+    Serial.println(WiFi.softAPIP());
   }
   Serial.println("\r\n");
 }
@@ -93,7 +122,13 @@ void startMDNS() { // Start the mDNS responder
   Serial.println(".local");
 }
 void startServer() { // Start a HTTP server with a file read handler and an upload handler
-  server.on("/", handleRoot);             // if someone requests any other file or page, go to function 'handleNotFound'                                             // and check if the file exists
+  //server.on("/", handleRoot);             // if someone requests any other file or page, go to function 'handleNotFound'                                             // and check if the file exists
+  //server.onNotFound(handleWebRequests); //Set setver all paths are not found so we can handle as per URI
+  server.serveStatic("/index.html", SPIFFS, "/index.html");
+  server.serveStatic("/jquery.mobile-1.4.5.min.css", SPIFFS, "/jquery.mobile-1.4.5.min.css");  
+  server.serveStatic("/jquery.mobile-1.4.5.min.js", SPIFFS, "/jquery.mobile-1.4.5.min.js");  
+  server.serveStatic("/jquery-1.11.1.min.js", SPIFFS, "/jquery-1.11.1.min.js");  
+  server.serveStatic("/", SPIFFS, "/index.html");
   server.begin();                             // start the HTTP server
   Serial.println("HTTP server started.");
 }
@@ -271,4 +306,28 @@ String getValue(String data, char separator, int index)
         }
     }
     return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
+}
+bool loadFromSpiffs(String path){
+  String dataType = "text/plain";
+  if(path.endsWith("/")) path += "index.htm";
+
+  if(path.endsWith(".src")) path = path.substring(0, path.lastIndexOf("."));
+  else if(path.endsWith(".html")) dataType = "text/html";
+  else if(path.endsWith(".htm")) dataType = "text/html";
+  else if(path.endsWith(".css")) dataType = "text/css";
+  else if(path.endsWith(".js")) dataType = "application/javascript";
+  else if(path.endsWith(".png")) dataType = "image/png";
+  else if(path.endsWith(".gif")) dataType = "image/gif";
+  else if(path.endsWith(".jpg")) dataType = "image/jpeg";
+  else if(path.endsWith(".ico")) dataType = "image/x-icon";
+  else if(path.endsWith(".xml")) dataType = "text/xml";
+  else if(path.endsWith(".pdf")) dataType = "application/pdf";
+  else if(path.endsWith(".zip")) dataType = "application/zip";
+  File dataFile = SPIFFS.open(path.c_str(), "r");
+  if (server.hasArg("download")) dataType = "application/octet-stream";
+  if (server.streamFile(dataFile, dataType) != dataFile.size()) {
+  }
+
+  dataFile.close();
+  return true;
 }

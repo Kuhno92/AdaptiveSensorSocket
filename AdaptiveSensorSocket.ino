@@ -1,3 +1,4 @@
+//************************************* INCLUDES *************************************************
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
 #include <ESP8266WebServer.h>
@@ -7,13 +8,14 @@
 #include "Ticker.h"
 #include <WebSocketsServer.h>
 #include "index.h"
+//************************************* VARIABLE DECLARATION **************************************
 const char* htmlfile = "/index.html";
 
 int relayPin = D5; // the input to the relay pin
 int sensor = D7;
 int sensor2 = D6;
 
-// WiFi parameters
+// WiFi parameters and variables
 const char *ssid = "Smart_Socket_Access_Point"; // The name of the Wi-Fi network that will be created
 const char *password = "123456789";   // The password required to connect to it, leave blank for
 const char* mdnsName = "smartsocket";
@@ -22,11 +24,13 @@ ESP8266WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 ESP8266WiFiMulti wifiMulti;       // Create an instance of the ESP8266WiFiMulti class, called 'wifiMulti'
 
-// Variables to be exposed to the API
+// Variables used to send as JSON via Websocket
 String sensorActive = "sensorInactive"; //options: sensorActive; sensorInactive
 int sensorType = 0; // 0 := No Sensor, 1 := Motion; 2 := Ultrasonic, 3 := Microphone, 4 := Temperature, 5 := Humidity, 6 := Network,
 int currentSensorConfig1 = -1;
 String uptime;
+
+//************************************* SETUP ***************************************************
 void setup() {
   pinMode(relayPin, OUTPUT); // initialize pin as OUTPUT
   pinMode(sensor2, OUTPUT); // initialize pin as OUTPUT
@@ -51,36 +55,15 @@ void setup() {
 
   startWiFi();
   startWebSocket();            // Start a WebSocket server
-  startMDNS();                 // Start the mDNS responder
+  if(WiFi.softAPgetStationNum() != 0){ startMDNS(); }  // Start the mDNS responder if AP mode
   startServer();               // Start a HTTP server with a file read handler and an upload handler
   getTime();
 }
-void loop() {
-  server.handleClient();          //Handle client requests
-  webSocket.loop();               // constantly check for websocket events
-}
-
+//**************************************INITIALIZATION FUNCTIONS (SETUP)************************
 //===============================================================
-// This routine is executed when you open its IP in browser
+// Wifi Initialization
+// - Connects to defined AP´s or creates on AP if no AP available
 //===============================================================
-void handleWebRequests(){
-  Serial.println(server.uri());
-  if(loadFromSpiffs(server.uri())) return;
-  String message = "File Not Detected\n\n";
-  message += "URI: ";
-  message += server.uri();
-  message += "\nMethod: ";
-  message += (server.method() == HTTP_GET)?"GET":"POST";
-  message += "\nArguments: ";
-  message += server.args();
-  message += "\n";
-  for (uint8_t i=0; i<server.args(); i++){
-    message += " NAME:"+server.argName(i) + "\n VALUE:" + server.arg(i) + "\n";
-  }
-  server.send(404, "text/plain", message);
-  Serial.println(message);
-}
-//**************************************INITIALIZATION FUNCTIONS ******************************************
 void startWiFi() { // Start a Wi-Fi access point, and try to connect to some given access points. Then wait for either an AP or STA connection
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(ssid, password);  
@@ -88,7 +71,7 @@ void startWiFi() { // Start a Wi-Fi access point, and try to connect to some giv
   Serial.print(ssid);
   Serial.println("\" started\r\n");
 
-  wifiMulti.addAP("DontTouchThis", "!No3nTrY!123456789");   // add Wi-Fi networks you want to connect to
+  wifiMulti.addAP("DontTouchThis", "**PASSWORD**");   // add Wi-Fi networks you want to connect to
   wifiMulti.addAP("ssid_from_AP_2", "your_password_for_AP_2");
   wifiMulti.addAP("ssid_from_AP_3", "your_password_for_AP_3");
 
@@ -112,24 +95,66 @@ void startWiFi() { // Start a Wi-Fi access point, and try to connect to some giv
   }
   Serial.println("\r\n");
 }
+//===============================================================
+// Initializes MDNS service
+//===============================================================
 void startMDNS() { // Start the mDNS responder
-  MDNS.begin(mdnsName);                        // start the multicast domain name server
+  MDNS.begin(mdnsName);  // start the multicast domain name server
   Serial.print("mDNS responder started: http://");
   Serial.print(mdnsName);
   Serial.println(".local");
 }
+//===============================================================
+// Server Initialization to handle Client Requests
+// - serves main page (index.html) from index.h file (include) 
+// - serves required javascripts and stylesheets from SPIFFS
+//===============================================================
 void startServer() { // Start a HTTP server with a file read handler and an upload handler
   server.on ( "/", []() { server.send ( 200, "text/html", SITE_index );  } );                                          // and check if the file exists
   server.onNotFound(handleWebRequests); //Set setver all paths are not found so we can handle as per URI
- 
+  server.begin(); 
   // start the HTTP server
   Serial.println("HTTP server started.");
 }
+//===============================================================
+// Initializes Websocket Server
+//===============================================================
 void startWebSocket() { // Start a WebSocket server
   webSocket.begin();                          // start the websocket server
   webSocket.onEvent(webSocketEvent);          // if there's an incomming websocket message, go to function 'webSocketEvent'
   Serial.println("WebSocket server started.");
 }
+//************************************* LOOP ***************************************************
+void loop() {
+  server.handleClient();          //Handle client requests
+  webSocket.loop();               // constantly check for websocket events
+}
+
+//************************************* Web Events ***************************************************
+//===============================================================
+// Handles Requests from the client except index.html
+// - Normal usage is to serve .js and .css from SPIFFS
+//===============================================================
+void handleWebRequests(){
+  Serial.println(server.uri());
+  if(loadFromSpiffs(server.uri())) return;
+  String message = "File Not Detected\n\n";
+  message += "URI: ";
+  message += server.uri();
+  message += "\nMethod: ";
+  message += (server.method() == HTTP_GET)?"GET":"POST";
+  message += "\nArguments: ";
+  message += server.args();
+  message += "\n";
+  for (uint8_t i=0; i<server.args(); i++){
+    message += " NAME:"+server.argName(i) + "\n VALUE:" + server.arg(i) + "\n";
+  }
+  server.send(404, "text/plain", message);
+  Serial.println(message);
+}
+//===============================================================
+// Handles Websocket requests
+//===============================================================
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t msglength) { // When a WebSocket message is received
   if(msglength == 0) {
     //Arduino Crashes if lenght == 0
@@ -142,8 +167,9 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t msglen
     case WStype_CONNECTED: {              // if a new websocket connection is established
         IPAddress ip = webSocket.remoteIP(num);
         Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
-        String ip = WiFi.localIP().toString()
-        webSocket.sendTXT(num, "{\"uptime\": \"" + uptime + "\", \"ip\": \"" + WiFi.localIP().toString() + " \", " + "\"sensor\": {\"sensortype\": " + sensorType + ", \"sensorActive\": \""+sensorActive+"\",\"SensorConfig1\": \""+currentSensorConfig1+"\" }}"); 
+        String ipadress ;
+        (WiFi.softAPgetStationNum() == 0) ? ipadress = WiFi.localIP().toString() : ipadress = WiFi.softAPIP().toString();
+        webSocket.sendTXT(num, "{\"uptime\": \"" + uptime + "\", \"ip\": \"" + ipadress + " \", " + "\"sensor\": {\"sensortype\": " + sensorType + ", \"sensorActive\": \""+sensorActive+"\",\"SensorConfig1\": \""+currentSensorConfig1+"\" }}"); 
       }
       break;
     case WStype_TEXT:                     // if new text data is received
@@ -152,8 +178,13 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t msglen
       break;
   }
 }
+//************************************* Sensor Routines ***************************************************
+//===============================================================
+// Motion Sensor Routine
+//===============================================================
 void pirSensorRoutine() {
   long state = digitalRead(sensor);
+  //webSocket.sendTXT(0, "{\"uptime\": \"" + uptime + "\", \"ip\": \"" + WiFi.localIP().toString() + " \", " + "\"sensor\": {\"sensortype\": " + sensorType + ", \"sensorvalue\": "+ distance + ", \"unit\": \"cm\", \"sensorActive\": \""+sensorActive+"\"}}");
   if(state == LOW) {
     socketOn();
   }
@@ -161,7 +192,9 @@ void pirSensorRoutine() {
     socketOff();
    }
 }
-
+//===============================================================
+// Ultrasonic Sensor Routine
+//===============================================================
 // defines variables
 int triggerDistance = 10; //cm
 long duration;
@@ -193,15 +226,10 @@ void ultrasonicSensorRoutine() {
     socketOff();
   }
 }
-void socketOn() {
-  digitalWrite(relayPin, HIGH); // turn relay off
-  //Serial.println("Socket ON");
-}
-
-void socketOff() {
-  digitalWrite(relayPin, LOW); // turn relay on
-  //Serial.println("Socket OFF");
-}
+//************************************* Sensor Routing ***************************************************
+//===============================================================
+// Parse Websocket commands
+//===============================================================
 String getValue(String data, char separator, int index);
 void parseWsCommands(uint8_t *payload){
   String command = String((char *)payload);
@@ -219,6 +247,9 @@ void parseWsCommands(uint8_t *payload){
   if(getValue(command, ':', 0) == "SensorConfig1" ) {sensorConfigurationRouter(getValue(command, ':', 1).toInt()); }
   if(sensorActive == "sensorActive"){sensorActionRouter();}
 }
+//===============================================================
+// Sets sensor service routine variables for the specific sensor
+//===============================================================
 void sensorConfigurationRouter(int config1){
   currentSensorConfig1 = config1;
   switch (sensorType) {
@@ -241,6 +272,9 @@ void sensorConfigurationRouter(int config1){
       break;
   }
 }
+//===============================================================
+// Ataches a ticker to the specified sensor
+//===============================================================
 void sensorActionRouter(){
   switch (sensorType) {
     case 0:
@@ -269,10 +303,31 @@ void sensorActionRouter(){
       break;
   }
 }
+//===============================================================
+// Stops the execution of the sensor service routines
+//===============================================================
 void stopTicker() {
   ultrasonicTicker.detach();
 }
+//************************************* Socket Functions ***************************************************
+//===============================================================
+// Turns Socket ON
+//===============================================================
+void socketOn() {
+  digitalWrite(relayPin, HIGH); // turn relay off
+  //Serial.println("Socket ON");
+}
+//===============================================================
+// Turns Socket OFF
+//===============================================================
+void socketOff() {
+  digitalWrite(relayPin, LOW); // turn relay on
+  //Serial.println("Socket OFF");
+}
 //**********************************HELPER FUNCTIONS ******************************
+//===============================================================
+// Gets current Time from the Internet 
+//===============================================================
 void getTime(){
   configTime(2 * 3600, 0, "pool.ntp.org", "time.nist.gov");
   int count = 0;
@@ -286,6 +341,9 @@ void getTime(){
   uptime .remove(uptime.length()-1);
   Serial.println("Start time: " + uptime);
 }
+//===============================================================
+// Split data by seperator and return the indexed data value
+//===============================================================
 String getValue(String data, char separator, int index)
 {
     int found = 0;
@@ -301,6 +359,9 @@ String getValue(String data, char separator, int index)
     }
     return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
+//===============================================================
+// Reads requested file from SPIFFS and streams it to the client
+//===============================================================
 bool loadFromSpiffs(String path){
   String dataType = "text/plain";
   if(path.endsWith("/")) path += "index.htm";

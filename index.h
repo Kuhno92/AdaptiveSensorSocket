@@ -85,7 +85,7 @@ const char SITE_index[] PROGMEM = R"=====(
           <select name="flip-2" class="sensorActiveButton" data-role="flipswitch" data-mini="true" data-theme="b"><option value="sensorInactive">OFF</option><option value="sensorActive">ON</option></select>
         </div>
         <div id="SoundDBSlider" class="ui-slider-slider" style="text-align: center; color:white; text-shadow: black 0.1em 0.1em 0.2em;""> 
-          <label style="font-size: 130%;">Volume(db) :</label>
+          <label style="font-size: 130%;">Delay(min) :</label>
           <input class="SensorConfigSlider1" id="Loudness" type="range" min="0" max="200" value="50" data-theme="a" data-track-theme="b" />
         </div>
         <br>

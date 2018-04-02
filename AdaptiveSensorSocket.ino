@@ -51,7 +51,6 @@ void setup() {
       String fileName = dir.fileName();
       size_t fileSize = dir.fileSize();
       Serial.printf("FS File: %s, size: %s\n", fileName.c_str(), String(fileSize).c_str());
-      Serial.println();
     }
 
   startWiFi();
@@ -184,13 +183,13 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t msglen
 //===============================================================
 Ticker motionTicker;
 String motion = "No motion";
-int socketDelay = 1;
+int motionDelay = 1;
 void motionSensorRoutine() {
   long state = digitalRead(sensor);
   if(state == LOW) {
     socketOn();
     motion = "Motion detected !!!";
-    motionTicker.attach(socketDelay, motionSensorRoutine);
+    motionTicker.attach(motionDelay, motionSensorRoutine);
   }
   else {
     socketOff();
@@ -232,6 +231,23 @@ void ultrasonicSensorRoutine() {
     socketOff();
   }
 }
+//===============================================================
+// Microphone Sensor Routine
+//===============================================================
+// defines variables
+Ticker microphoneTicker;
+int micDelay = 1;
+void microphoneSensorRoutine() { 
+  boolean  val = digitalRead(sensor);
+  if(val==HIGH) {
+    socketOn();
+    microphoneTicker.attach(micDelay, microphoneSensorRoutine);
+  } else {
+    socketOff();
+    microphoneTicker.attach(.1, microphoneSensorRoutine);
+  }
+  webSocket.sendTXT(0, "{\"uptime\": \"" + uptime + "\", \"ip\": \"" + ipadress + " \", " + "\"sensor\": {\"sensortype\": " + sensorType + ", \"sensorvalue\": "+ val + ", \"unit\": \" \", \"sensorActive\": \""+sensorActive+"\"}}");
+}
 //************************************* Sensor Routing ***************************************************
 //===============================================================
 // Parse Websocket commands
@@ -268,7 +284,7 @@ void sensorActionRouter(){
       stopTicker(); ultrasonicTicker.attach(0.5, ultrasonicSensorRoutine);
       break;
     case 3:
-      stopTicker();
+      stopTicker(); microphoneTicker.attach(0.1, microphoneSensorRoutine);
       break;
     case 4:
       stopTicker();
@@ -293,12 +309,13 @@ void sensorConfigurationRouter(int config1){
     case 0:
       break;
     case 1:
-      socketDelay = config1;
+      motionDelay = config1;
       break;
     case 2:
       triggerDistance = config1;
       break;
     case 3:
+      micDelay = config1;
       break;
     case 4:
       break;
@@ -316,6 +333,7 @@ void sensorConfigurationRouter(int config1){
 void stopTicker() {
   ultrasonicTicker.detach();
   motionTicker.detach();
+  microphoneTicker.detach();
 }
 //************************************* Socket Functions ***************************************************
 //===============================================================

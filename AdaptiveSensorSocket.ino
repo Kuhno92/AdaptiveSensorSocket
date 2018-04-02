@@ -29,6 +29,7 @@ String sensorActive = "sensorInactive"; //options: sensorActive; sensorInactive
 int sensorType = 0; // 0 := No Sensor, 1 := Motion; 2 := Ultrasonic, 3 := Microphone, 4 := Temperature, 5 := Humidity, 6 := Network,
 int currentSensorConfig1 = -1;
 String uptime;
+String ipadress ;
 
 //************************************* SETUP ***************************************************
 void setup() {
@@ -94,6 +95,7 @@ void startWiFi() { // Start a Wi-Fi access point, and try to connect to some giv
     WiFi.disconnect(); 
   }
   Serial.println("\r\n");
+  (WiFi.softAPgetStationNum() == 0) ? ipadress = WiFi.localIP().toString() : ipadress = WiFi.softAPIP().toString();
 }
 //===============================================================
 // Initializes MDNS service
@@ -167,8 +169,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t msglen
     case WStype_CONNECTED: {              // if a new websocket connection is established
         IPAddress ip = webSocket.remoteIP(num);
         Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
-        String ipadress ;
-        (WiFi.softAPgetStationNum() == 0) ? ipadress = WiFi.localIP().toString() : ipadress = WiFi.softAPIP().toString();
         webSocket.sendTXT(num, "{\"uptime\": \"" + uptime + "\", \"ip\": \"" + ipadress + " \", " + "\"sensor\": {\"sensortype\": " + sensorType + ", \"sensorActive\": \""+sensorActive+"\",\"SensorConfig1\": \""+currentSensorConfig1+"\" }}"); 
       }
       break;
@@ -182,15 +182,22 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t msglen
 //===============================================================
 // Motion Sensor Routine
 //===============================================================
-void pirSensorRoutine() {
+Ticker motionTicker;
+String motion = "No motion";
+int socketDelay = 1;
+void motionSensorRoutine() {
   long state = digitalRead(sensor);
-  //webSocket.sendTXT(0, "{\"uptime\": \"" + uptime + "\", \"ip\": \"" + WiFi.localIP().toString() + " \", " + "\"sensor\": {\"sensortype\": " + sensorType + ", \"sensorvalue\": "+ distance + ", \"unit\": \"cm\", \"sensorActive\": \""+sensorActive+"\"}}");
   if(state == LOW) {
     socketOn();
+    motion = "Motion detected !!!";
+    motionTicker.attach(socketDelay, motionSensorRoutine);
   }
   else {
     socketOff();
-   }
+    motion = "No motion";
+    motionTicker.attach(1, motionSensorRoutine);
+  }
+  webSocket.sendTXT(0, "{\"uptime\": \"" + uptime + "\", \"ip\": \"" + ipadress + " \", " + "\"sensor\": {\"sensortype\": " + sensorType + ", \"sensorvalue\": \""+ motion + "\", \"unit\": \" \", \"sensorActive\": \""+sensorActive+"\"}}");
 }
 //===============================================================
 // Ultrasonic Sensor Routine
@@ -199,7 +206,6 @@ void pirSensorRoutine() {
 int triggerDistance = 10; //cm
 long duration;
 int distance;
-void ultrasonicSensorRoutine();
 Ticker ultrasonicTicker;
 void ultrasonicSensorRoutine() { 
   // Clears the trigPin
@@ -219,7 +225,7 @@ void ultrasonicSensorRoutine() {
   // Prints the distance on the Serial Monitor
   //Serial.print("Distance: ");
   //Serial.println(distance);
-  webSocket.sendTXT(0, "{\"uptime\": \"" + uptime + "\", \"ip\": \"" + WiFi.localIP().toString() + " \", " + "\"sensor\": {\"sensortype\": " + sensorType + ", \"sensorvalue\": "+ distance + ", \"unit\": \"cm\", \"sensorActive\": \""+sensorActive+"\"}}");
+  webSocket.sendTXT(0, "{\"uptime\": \"" + uptime + "\", \"ip\": \"" + ipadress + " \", " + "\"sensor\": {\"sensortype\": " + sensorType + ", \"sensorvalue\": "+ distance + ", \"unit\": \"cm\", \"sensorActive\": \""+sensorActive+"\"}}");
   if(distance <= triggerDistance) {
     socketOn();
   } else {
@@ -248,31 +254,6 @@ void parseWsCommands(uint8_t *payload){
   if(sensorActive == "sensorActive"){sensorActionRouter();}
 }
 //===============================================================
-// Sets sensor service routine variables for the specific sensor
-//===============================================================
-void sensorConfigurationRouter(int config1){
-  currentSensorConfig1 = config1;
-  switch (sensorType) {
-    case 0:
-      break;
-    case 1:
-      break;
-    case 2:
-      triggerDistance = config1;
-      break;
-    case 3:
-      break;
-    case 4:
-      break;
-    case 5:
-      break;
-    case 6:
-      break;
-    default:
-      break;
-  }
-}
-//===============================================================
 // Ataches a ticker to the specified sensor
 //===============================================================
 void sensorActionRouter(){
@@ -281,7 +262,7 @@ void sensorActionRouter(){
       stopTicker();
       break;
     case 1:
-      stopTicker(); pirSensorRoutine();
+      stopTicker(); motionTicker.attach(1, motionSensorRoutine);
       break;
     case 2:
       stopTicker(); ultrasonicTicker.attach(0.5, ultrasonicSensorRoutine);
@@ -304,10 +285,37 @@ void sensorActionRouter(){
   }
 }
 //===============================================================
+// Sets sensor service routine variables for the specific sensor
+//===============================================================
+void sensorConfigurationRouter(int config1){
+  currentSensorConfig1 = config1;
+  switch (sensorType) {
+    case 0:
+      break;
+    case 1:
+      socketDelay = config1;
+      break;
+    case 2:
+      triggerDistance = config1;
+      break;
+    case 3:
+      break;
+    case 4:
+      break;
+    case 5:
+      break;
+    case 6:
+      break;
+    default:
+      break;
+  }
+}
+//===============================================================
 // Stops the execution of the sensor service routines
 //===============================================================
 void stopTicker() {
   ultrasonicTicker.detach();
+  motionTicker.detach();
 }
 //************************************* Socket Functions ***************************************************
 //===============================================================

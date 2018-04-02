@@ -269,8 +269,8 @@ const char SITE_index[] PROGMEM = R"=====(
       //update device info
       var items = document.getElementById("info").childNodes;
       obj.sensor.sensortype != 0 ? document.getElementsByClassName("sensor")[obj.sensor.sensortype-1].style.display = "block" : null;
-      items[1].innerHTML = "<b>BootUp Time: "+obj.uptime+"</b>"; 
-      items[3].innerHTML = "<b>IP Adress: "+obj.ip+"</b>";
+      items[1].innerHTML = "<b>BootUp Time: "+"</b>"+obj.uptime; 
+      items[3].innerHTML = "<b>IP Adress: "+"</b>"+obj.ip;
       //update Sensor Function Activation Buttons
       $('.sensorActiveButton').each(function(i, btn) {
         btn.value = obj.sensor.sensorActive;

@@ -6,7 +6,7 @@
 #include <time.h>
 #include "Ticker.h"
 #include <WebSocketsServer.h>
-
+#include "index.h"
 const char* htmlfile = "/index.html";
 
 int relayPin = D5; // the input to the relay pin
@@ -22,9 +22,6 @@ ESP8266WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 ESP8266WiFiMulti wifiMulti;       // Create an instance of the ESP8266WiFiMulti class, called 'wifiMulti'
 
-// Declare functions to be exposed to the API
-int ledControl(String command);
-
 // Variables to be exposed to the API
 String sensorActive = "sensorInactive"; //options: sensorActive; sensorInactive
 int sensorType = 0; // 0 := No Sensor, 1 := Motion; 2 := Ultrasonic, 3 := Microphone, 4 := Temperature, 5 := Humidity, 6 := Network,
@@ -35,6 +32,8 @@ void setup() {
   pinMode(sensor2, OUTPUT); // initialize pin as OUTPUT
   pinMode(sensor, INPUT); // initialize pin as INPUT
   digitalWrite(relayPin, LOW); // init relay to off
+
+  ESP.eraseConfig();
   
   // Start Serial
   Serial.begin(9600);
@@ -64,11 +63,8 @@ void loop() {
 //===============================================================
 // This routine is executed when you open its IP in browser
 //===============================================================
-void handleRoot() {
-  server.sendHeader("Location", "/index.html",true);   //Redirect to our html web page
-  server.send(302, "text/plane","");
-}
 void handleWebRequests(){
+  Serial.println(server.uri());
   if(loadFromSpiffs(server.uri())) return;
   String message = "File Not Detected\n\n";
   message += "URI: ";
@@ -86,7 +82,7 @@ void handleWebRequests(){
 }
 //**************************************INITIALIZATION FUNCTIONS ******************************************
 void startWiFi() { // Start a Wi-Fi access point, and try to connect to some given access points. Then wait for either an AP or STA connection
-  WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(ssid, password);  
   Serial.print("Access Point \"");
   Serial.print(ssid);
@@ -110,8 +106,9 @@ void startWiFi() { // Start a Wi-Fi access point, and try to connect to some giv
     WiFi.mode(WIFI_STA);
   } else {
     // If a station is connected to the ESP SoftAP
-    Serial.print("Station connected to ESP8266 AP");
+    Serial.println("Station connected to ESP8266 AP");
     Serial.println(WiFi.softAPIP());
+    WiFi.disconnect(); 
   }
   Serial.println("\r\n");
 }
@@ -122,14 +119,10 @@ void startMDNS() { // Start the mDNS responder
   Serial.println(".local");
 }
 void startServer() { // Start a HTTP server with a file read handler and an upload handler
-  //server.on("/", handleRoot);             // if someone requests any other file or page, go to function 'handleNotFound'                                             // and check if the file exists
-  //server.onNotFound(handleWebRequests); //Set setver all paths are not found so we can handle as per URI
-  server.serveStatic("/index.html", SPIFFS, "/index.html");
-  server.serveStatic("/jquery.mobile-1.4.5.min.css", SPIFFS, "/jquery.mobile-1.4.5.min.css");  
-  server.serveStatic("/jquery.mobile-1.4.5.min.js", SPIFFS, "/jquery.mobile-1.4.5.min.js");  
-  server.serveStatic("/jquery-1.11.1.min.js", SPIFFS, "/jquery-1.11.1.min.js");  
-  server.serveStatic("/", SPIFFS, "/index.html");
-  server.begin();                             // start the HTTP server
+  server.on ( "/", []() { server.send ( 200, "text/html", SITE_index );  } );                                          // and check if the file exists
+  server.onNotFound(handleWebRequests); //Set setver all paths are not found so we can handle as per URI
+ 
+  // start the HTTP server
   Serial.println("HTTP server started.");
 }
 void startWebSocket() { // Start a WebSocket server
@@ -149,6 +142,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t msglen
     case WStype_CONNECTED: {              // if a new websocket connection is established
         IPAddress ip = webSocket.remoteIP(num);
         Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
+        String ip = WiFi.localIP().toString()
         webSocket.sendTXT(num, "{\"uptime\": \"" + uptime + "\", \"ip\": \"" + WiFi.localIP().toString() + " \", " + "\"sensor\": {\"sensortype\": " + sensorType + ", \"sensorActive\": \""+sensorActive+"\",\"SensorConfig1\": \""+currentSensorConfig1+"\" }}"); 
       }
       break;

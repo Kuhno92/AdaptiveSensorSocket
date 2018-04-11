@@ -93,6 +93,6 @@ Smart sockets with sensors are not available right now, except for motion sensor
 [Homecube Smart Socket](https://www.amazon.de/Steckdose-Homecube-intelligente-Verbrauchsanzeige-funktioniert/dp/B076Q2FDY2/ref=sr_1_6?ie=UTF8&qid=1523448473&sr=8-6&keywords=smart+socket)  38.99€ (01.04.2018)
 [Belkin Motion Socket](https://www.amazon.de/Automation-Motion-Sensor-intelligente-Steckdose-Android-Ger%C3%A4te/dp/B008TPW2EU/ref=sr_1_6?s=diy&ie=UTF8&qid=1523448552&sr=1-6&keywords=sensor+steckdose) 46.95€ (01.04.2018)
 
-[schema]: fritzing/fritzing_bb.png "Schema from SmartKanne"
-[bmc]: docs/AdaptiveSensorSocket-Canvas-Canvanizer.pdf "Business Model Canvas"
-[print]: docs/printing.mp4  "3d printing of housing timelapse"
+[schema]: Fritzing/Fritzing_bb.png "Schema from Socket"
+[bmc]: docs/canvas.png "Business Model Canvas"
+[print]: docs/printing.gif  "3d printing of housing timelapse"

@@ -1,5 +1,6 @@
 //************************************* INCLUDES *************************************************
 #include <ESP8266WiFi.h>
+#include <ESP8266Ping.h>
 #include <ESP8266WiFiMulti.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
@@ -71,8 +72,8 @@ void startWiFi() { // Start a Wi-Fi access point, and try to connect to some giv
   Serial.print(ssid);
   Serial.println("\" started\r\n");
 
-  wifiMulti.addAP("DontTouchThis", "**PASSWORD**");   // add Wi-Fi networks you want to connect to
-  wifiMulti.addAP("ssid_from_AP_2", "your_password_for_AP_2");
+  wifiMulti.addAP("DontTouchThis", "!No3nTrY!1234567890");   // add Wi-Fi networks you want to connect to
+  wifiMulti.addAP("iPhone von Kuhno92", "1234567890");
   wifiMulti.addAP("ssid_from_AP_3", "your_password_for_AP_3");
 
   Serial.println("Connecting");
@@ -82,6 +83,7 @@ void startWiFi() { // Start a Wi-Fi access point, and try to connect to some giv
   }
   Serial.println("\r\n");
   if(WiFi.softAPgetStationNum() == 0) {      // If the ESP is connected to an AP
+    WiFi.softAPdisconnect();
     Serial.print("Connected to ");
     Serial.println(WiFi.SSID());             // Tell us what network we're connected to
     Serial.print("IP address:\t");
@@ -128,7 +130,8 @@ void startWebSocket() { // Start a WebSocket server
 //************************************* LOOP ***************************************************
 void loop() {
   server.handleClient();          //Handle client requests
-  webSocket.loop();               // constantly check for websocket events
+  webSocket.loop();               // constantly check for websocket events  
+
 }
 
 //************************************* Web Events ***************************************************
@@ -248,6 +251,40 @@ void microphoneSensorRoutine() {
   }
   webSocket.sendTXT(0, "{\"uptime\": \"" + uptime + "\", \"ip\": \"" + ipadress + " \", " + "\"sensor\": {\"sensortype\": " + sensorType + ", \"sensorvalue\": "+ val + ", \"unit\": \" \", \"sensorActive\": \""+sensorActive+"\"}}");
 }
+//===============================================================
+// Network Sensor Routine (Wifi)
+//===============================================================
+// defines variables
+Ticker networkTicker;
+int networkcheckDelay = 5; //seconds
+void networkSensorRoutine() {
+  webSocket.sendTXT(0, "{\"uptime\": \"" + uptime + "\", \"ip\": \"" + WiFi.softAPIP() + " \", " + "\"sensor\": {\"sensortype\": " + sensorType + ", \"sensorvalue\": "+ " \" Access Point "+ssid+" started ...\" " + ", \"unit\": \" \", \"sensorActive\": \""+sensorActive+"\"}}");
+  if(sensorActive == "sensorInactive"){
+    WiFi.softAPdisconnect();
+   ESP.reset();
+  } else {
+    if (WiFi.softAPgetStationNum() > 0) { 
+      return;
+    }
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.softAP(ssid, password);  
+    Serial.print("Access Point \"");
+    Serial.print(ssid);
+    Serial.println("\" started\r\n");
+    while (WiFi.softAPgetStationNum() < 1) {  // Wait for the Wi-Fi to connect
+      delay(250);
+      Serial.print('!');
+    }
+    Serial.println("\r\n");
+    if(WiFi.softAPgetStationNum() > 0) {      // If the ESP is connected to an AP
+      // If a station is connected to the ESP SoftAP
+      Serial.println("Station connected to ESP8266 AP");
+      Serial.println(WiFi.softAPIP());
+      WiFi.disconnect(); 
+      startMDNS();
+    }
+  }
+}
 //************************************* Sensor Routing ***************************************************
 //===============================================================
 // Parse Websocket commands
@@ -257,12 +294,12 @@ void parseWsCommands(uint8_t *payload){
   String command = String((char *)payload);
   if( command == "ON" ) {socketOn(); }
   if( command == "OFF" ) {socketOff(); }
-  if( command == "sensorActive" ) {sensorActive = "sensorActive"; sensorActionRouter(); }
+  if( command == "sensorActive" ) {sensorActive = "sensorActive";}
   if( command == "sensorInactive" ) {sensorActive = "sensorInactive"; stopTicker(); }
   if( command == "No Sensor" ) {currentSensorConfig1 = -1; sensorType =  0; } 
-  if( command == "Motion Sensor" ) {currentSensorConfig1 = -1; sensorType = 1; }
+  if( command == "Motion Sensor" ) {sensorType = 1; sensorConfigurationRouter(1);}
   if( command == "Ultrasonic Sensor" ) {sensorType = 2; sensorConfigurationRouter(10);}
-  if( command == "Microphone" ) {currentSensorConfig1 = -1; sensorType = 3; }
+  if( command == "Microphone" ) {sensorType = 3; sensorConfigurationRouter(1);}
   if( command == "Temperature Sensor" ) {currentSensorConfig1 = -1; sensorType = 4; }
   if( command == "Humidity Sensor" ) {currentSensorConfig1 = -1; sensorType = 5; }
   if( command == "Network Sensor" ) {currentSensorConfig1 = -1; sensorType = 6; }
@@ -293,7 +330,7 @@ void sensorActionRouter(){
       stopTicker();
       break;
     case 6:
-      stopTicker();
+      stopTicker(); networkSensorRoutine();
       break;
     default:
       stopTicker();
@@ -334,6 +371,8 @@ void stopTicker() {
   ultrasonicTicker.detach();
   motionTicker.detach();
   microphoneTicker.detach();
+  networkTicker.detach();
+  if(sensorType == 6) {networkSensorRoutine();}
 }
 //************************************* Socket Functions ***************************************************
 //===============================================================
@@ -364,7 +403,7 @@ void getTime(){
   }
   time_t now = time(nullptr);
   uptime = ctime(&now);
-  uptime .remove(uptime.length()-1);
+  uptime.remove(uptime.length()-1);
   Serial.println("Start time: " + uptime);
 }
 //===============================================================

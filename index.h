@@ -131,10 +131,6 @@ const char SITE_index[] PROGMEM = R"=====(
           <label for="flip-2" style="width: auto"><h4 style="-webkit-margin-before: 0px;">Socket Activation Functions:</h4></label>
           <select name="flip-2" class="sensorActiveButton" data-role="flipswitch" data-mini="true" data-theme="b"><option value="sensorInactive">OFF</option><option value="sensorActive">ON</option></select>
         </div>
-        <div id="TimeoutSlider" class="ui-slider-slider" style="text-align: center; color:white; text-shadow: black 0.1em 0.1em 0.2em;""> 
-          <label style="font-size: 130%;">Timeout(s) :</label>
-          <input class="SensorConfigSlider1" id="timeout" type="range" min="0" max="100" value="5" data-theme="a" data-track-theme="b" />
-        </div>
         <br>
         <h4>Status:</h4>
         <textarea name="textarea" disabled id="textarea-a" cols="1" rows="1" style="color: #FFFFFF; opacity: 0.8; padding-left: -100px;">
@@ -231,16 +227,18 @@ const char SITE_index[] PROGMEM = R"=====(
 
       //Update Collapsable Header
       document.getElementById("SensorCollapsible").firstChild.firstChild.innerHTML = type + '<img src=' + e.target.style.backgroundImage.slice(4, -1) + 'alt="US Flag" style="postion: absolute; float:right; filter: brightness(0) invert(1); width:40px; height:40px; margin-top: -10px; margin-bottom: -15px" />'
+      //Disable all Sensor Functions
+      $('.sensorActiveButton').each(function(i, btn) {
+        btn.value = "sensorInactive";
+      });
+      $( ".sensorActiveButton" ).flipswitch( "refresh" );
+
       connection.send(document.getElementsByClassName("sensorActiveButton")[0].value)
       connection.send(type);
     });
 
     $( ".sensorActiveButton" ).change(function(e){
       connection.send(e.target.value)
-      $('.sensorActiveButton').each(function(i, btn) {
-        btn.value = e.target.value;
-      });
-      $( ".sensorActiveButton" ).flipswitch( "refresh" );
     });
 
     //Sensor COnfiguration Slider

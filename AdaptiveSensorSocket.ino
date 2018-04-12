@@ -72,8 +72,8 @@ void startWiFi() { // Start a Wi-Fi access point, and try to connect to some giv
   Serial.print(ssid);
   Serial.println("\" started\r\n");
 
-  wifiMulti.addAP("DontTouchThis", "!No3nTrY!1234567890");   // add Wi-Fi networks you want to connect to
-  wifiMulti.addAP("iPhone von Kuhno92", "1234567890");
+  wifiMulti.addAP("tecoLecture", "password");   // add Wi-Fi networks you want to connect to
+  wifiMulti.addAP("iPhone von myself", "password");
   wifiMulti.addAP("ssid_from_AP_3", "your_password_for_AP_3");
 
   Serial.println("Connecting");
@@ -239,7 +239,7 @@ void ultrasonicSensorRoutine() {
 //===============================================================
 // defines variables
 Ticker microphoneTicker;
-int micDelay = 1;
+int micDelay = 5;
 void microphoneSensorRoutine() { 
   boolean  val = digitalRead(sensor);
   if(val==HIGH) {
@@ -299,7 +299,7 @@ void parseWsCommands(uint8_t *payload){
   if( command == "No Sensor" ) {currentSensorConfig1 = -1; sensorType =  0; } 
   if( command == "Motion Sensor" ) {sensorType = 1; sensorConfigurationRouter(1);}
   if( command == "Ultrasonic Sensor" ) {sensorType = 2; sensorConfigurationRouter(10);}
-  if( command == "Microphone" ) {sensorType = 3; sensorConfigurationRouter(1);}
+  if( command == "Microphone" ) {sensorType = 3; sensorConfigurationRouter(5);}
   if( command == "Temperature Sensor" ) {currentSensorConfig1 = -1; sensorType = 4; }
   if( command == "Humidity Sensor" ) {currentSensorConfig1 = -1; sensorType = 5; }
   if( command == "Network Sensor" ) {currentSensorConfig1 = -1; sensorType = 6; }

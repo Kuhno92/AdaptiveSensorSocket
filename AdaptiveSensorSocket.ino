@@ -13,8 +13,8 @@
 const char* htmlfile = "/index.html";
 
 int relayPin = D5; // the input to the relay pin
-int sensor = D7;
-int sensor2 = D6;
+int sensor = D6;
+int sensor2 = D7;
 
 // WiFi parameters and variables
 const char *ssid = "Smart_Socket_Access_Point"; // The name of the Wi-Fi network that will be created
@@ -63,7 +63,7 @@ void setup() {
 //**************************************INITIALIZATION FUNCTIONS (SETUP)************************
 //===============================================================
 // Wifi Initialization
-// - Connects to defined AP´s or creates on AP if no AP available
+// - Connects to defined APÂ´s or creates on AP if no AP available
 //===============================================================
 void startWiFi() { // Start a Wi-Fi access point, and try to connect to some given access points. Then wait for either an AP or STA connection
   WiFi.mode(WIFI_AP_STA);
@@ -451,3 +451,4 @@ bool loadFromSpiffs(String path){
   dataFile.close();
   return true;
 }
+
